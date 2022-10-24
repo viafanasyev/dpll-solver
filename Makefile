@@ -19,10 +19,13 @@ debug: $(SOURCES)
 	mkdir -p $(shell dirname $(DEBUG_TARGET))
 	$(CC) $(CFLAGS) -DDEBUG -g $(SOURCES) -o $(DEBUG_TARGET)
 
-test: testleak
+test: testleak testsat
 
 testleak: debug
 	$(TEST_DIR)/memory-leakage/run-all-tests.sh $(shell pwd)/$(DEBUG_TARGET)
+
+testsat: release
+	$(TEST_DIR)/sat/run-all-tests.sh $(shell pwd)/$(RELEASE_TARGET)
 
 clean:
 	rm -rf $(OUT_DIR)
