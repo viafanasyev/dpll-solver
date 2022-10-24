@@ -1,2 +1,2 @@
 dpll
-tests/**
+tests/**/logs
