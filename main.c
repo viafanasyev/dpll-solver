@@ -26,6 +26,18 @@ int main(int argc, char* argv[]) {
 
     DEBUG_PRINTF("Vars num: %zu", cnf->vars_num);
     DEBUG_PRINTF("Clauses num: %zu", cnf->clauses_num);
+    #ifdef DEBUG
+    for (size_t i = 0; i < cnf->clauses_num; ++i) {
+        Clause* clause = cnf->clauses[i];
+        size_t vars_num = clause->len;
+        signed int* vars = clause->vars;
+        printf("   ");
+        for (size_t j = 0; j < vars_num; ++j) {
+            printf(" %d", vars[j]);
+        }
+        printf("\n");
+    }
+    #endif
 
     DpllResult result = dpll_check_sat(cnf);
 
