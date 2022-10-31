@@ -20,8 +20,8 @@ if [[ $? -ne 0 ]]; then
     failure "Program terminated with non-zero exit code" $2
 fi
 
-if [[ $ACT_OUTPUT != 'SAT' ]]; then
-    failure "Expected 'SAT', but got '$ACT_OUTPUT'" $2
+if [[ $ACT_OUTPUT != 'UNSAT' ]]; then
+    failure "Expected 'UNSAT', but got '$ACT_OUTPUT'" $2
 else
     success $2
 fi
