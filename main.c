@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include "debug.h"
 #include "cnf.h"
+#include "dpll.h"
 
 int main(int argc, char* argv[]) {
     if (argc != 2) {
@@ -26,6 +27,8 @@ int main(int argc, char* argv[]) {
     DEBUG_PRINTF("Vars num: %zu", cnf->vars_num);
     DEBUG_PRINTF("Clauses num: %zu", cnf->clauses_num);
 
+    DpllResult result = dpll_check_sat(cnf);
+
     for (size_t i = 0; i < cnf->clauses_num; ++i) {
         free(cnf->clauses[i]->vars);
         free(cnf->clauses[i]);
@@ -33,6 +36,19 @@ int main(int argc, char* argv[]) {
     free(cnf->clauses);
     free(cnf);
 
-    return 0;
+    switch (result) {
+        case SAT:
+            printf("SAT");
+            return 0;
+        case UNSAT:
+            printf("UNSAT");
+            return 0;
+        case ERROR:
+            fprintf(stderr, "DPLL exited with error\n");
+            exit(EXIT_FAILURE);
+        default:
+            fprintf(stderr, "Unknown DPLL result: %d\n", result);
+            exit(EXIT_FAILURE);
+    }
 }
 

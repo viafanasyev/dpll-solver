@@ -1,6 +1,6 @@
 CC                  = gcc
 CFLAGS              = -std=c11 -Wpedantic -Werror
-SOURCES             = main.c cnf.c
+SOURCES             = main.c cnf.c dpll.c bitvector.c
 TEST_DIR            = tests
 TEST_FAIL_EXIT_CODE = 100500
 OUT_DIR				= out
