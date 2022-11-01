@@ -13,7 +13,7 @@ all: release debug
 
 release: $(SOURCES)
 	mkdir -p $(shell dirname $(RELEASE_TARGET))
-	$(CC) $(CFLAGS) -O2 $(SOURCES) -o $(RELEASE_TARGET)
+	$(CC) $(CFLAGS) -DNDEBUG -O2 $(SOURCES) -o $(RELEASE_TARGET)
 
 debug: $(SOURCES)
 	mkdir -p $(shell dirname $(DEBUG_TARGET))
