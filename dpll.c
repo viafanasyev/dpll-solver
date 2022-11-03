@@ -19,6 +19,11 @@ typedef struct DpllStateStack {
     struct DpllStateStack* previous;
 } DpllStateStack;
 
+typedef struct ClausesList {
+    Clause* clause;
+    struct ClausesList* next;
+} ClausesList;
+
 static DpllStateStack* push_dpll_state(DpllStateStack* stack, TriVector* vars_states) {
     // stack may be null
     assert(vars_states != NULL);
@@ -40,6 +45,29 @@ static DpllStateStack* pop_dpll_state(DpllStateStack* stack) {
     DpllStateStack* new_stack = stack->previous;
     free(stack);
     return new_stack;
+}
+
+static ClausesList* list_prepend(ClausesList* item, Clause* clause) {
+    // item may be null
+    assert(clause != NULL);
+
+    ClausesList* new_item = calloc(1, sizeof(ClausesList));
+    if (new_item == NULL) {
+        DPLL_ERROR("Insufficient memory");
+        return NULL;
+    }
+
+    new_item->clause = clause;
+    new_item->next = item;
+    return new_item;
+}
+
+static ClausesList* list_drop_current(ClausesList* item) {
+    assert(item != NULL);
+
+    ClausesList* next = item->next;
+    free(item);
+    return next;
 }
 
 static inline size_t var_to_index(signed int var) {
@@ -190,6 +218,62 @@ static void propagate_all_units(
     } while (any_changes);
 }
 
+static void propagate_units_for_toggled_var(
+    const CNF* cnf,
+    TriVector* vars_states,
+    ClausesList** positive_occurance_list,
+    ClausesList** negative_occurance_list,
+    size_t toggled_var_index,
+    bool is_positive
+) {
+    assert(cnf != NULL);
+    assert(vars_states != NULL);
+    assert(positive_occurance_list != NULL);
+    assert(negative_occurance_list != NULL);
+    assert(positive_occurance_list != negative_occurance_list);
+
+    size_t vars_num = cnf->vars_num;
+    ClausesList** clauses_to_process = (ClausesList**) calloc(vars_num, sizeof(ClausesList*));
+    if (clauses_to_process == NULL) {
+        DPLL_ERROR("Insufficient memory");
+        return; // TODO: Pass error to caller?
+    }
+
+    if (is_positive) {
+        clauses_to_process[toggled_var_index] = negative_occurance_list[toggled_var_index];
+    } else {
+        clauses_to_process[toggled_var_index] = positive_occurance_list[toggled_var_index];
+    }
+
+    bool any_changes = false;
+    do {
+        any_changes = false;
+        for (size_t i = 0; i < vars_num; ++i) {
+            ClausesList* current_list_item = clauses_to_process[i];
+            clauses_to_process[i] = NULL;
+            while (current_list_item != NULL) {
+                signed int undecided_var = get_single_undecided_var_or_zero(current_list_item->clause, vars_states);
+                if (undecided_var != 0) {
+                    size_t var_index = var_to_index(undecided_var);
+                    assert(is_not_set(vars_states, var_index));
+
+                    if (undecided_var > 0) {
+                        set_state(vars_states, var_index, true);
+                        clauses_to_process[var_index] = negative_occurance_list[var_index];
+                    } else {
+                        set_state(vars_states, var_index, false);
+                        clauses_to_process[var_index] = positive_occurance_list[var_index];
+                    }
+                    any_changes = true;
+                }
+                current_list_item = current_list_item->next;
+            }
+        }
+    } while (any_changes);
+
+    free(clauses_to_process);
+}
+
 size_t choose_var(
     const CNF* cnf,
     const TriVector* vars_states
@@ -203,34 +287,100 @@ size_t choose_var(
     return var;
 }
 
+static ClausesList** create_occurance_list(
+    const CNF* cnf,
+    bool for_positive_vars
+) {
+    assert(cnf != NULL);
+
+    size_t vars_num = cnf->vars_num;
+    ClausesList** vars_lists = calloc(vars_num, sizeof(ClausesList*));
+    if (vars_lists == NULL) {
+        DPLL_ERROR("Insufficient memory");
+        goto error;
+    }
+
+    Clause** clauses = cnf->clauses;
+    size_t clauses_num = cnf->clauses_num;
+    for (size_t clause_num = 0; clause_num < clauses_num; ++clause_num) {
+        Clause* clause = clauses[clause_num];
+        size_t len = clause->len;
+        signed int* vars = clause->vars;
+        signed int undecided_var = 0;
+        for (size_t var_num = 0; var_num < len; ++var_num) {
+            signed int var = vars[var_num];
+            assert(var != 0);
+            if (for_positive_vars && var > 0 || !for_positive_vars && var < 0) {
+                size_t var_index = var_to_index(var);
+                vars_lists[var_index] = list_prepend(vars_lists[var_index], clause);
+                if (vars_lists[var_index] == NULL) {
+                    DPLL_ERROR("Insufficient memory");
+                    goto error;
+                }
+            }
+        }
+    }
+
+    return vars_lists;
+
+error:
+    if (vars_lists != NULL) {
+        for (size_t i = 0; i < vars_num; ++i) {
+            while (vars_lists[i] != NULL) {
+                vars_lists[i] = list_drop_current(vars_lists[i]);
+            }
+        }
+        free(vars_lists);
+    }
+    return NULL;
+}
+
 DpllResult dpll_check_sat(const CNF* cnf) {
     assert(cnf != NULL);
 
-    TriVector* vars_states = create_tri_vector(cnf->vars_num);
-    if (vars_states == NULL) {
-        DPLL_ERROR("Insufficient memory");
-        return ERROR;
-    }
-
+    TriVector* vars_states = NULL;
     DpllStateStack* cur_state = NULL;
-    cur_state = push_dpll_state(cur_state, vars_states);
-    if (cur_state == NULL) {
-        DPLL_ERROR("Insufficient memory");
-        free(vars_states->states);
-        free(vars_states);
-        return ERROR;
-    }
+    ClausesList** positive_occurance_list = NULL;
+    ClausesList** negative_occurance_list = NULL;
 
     TriVector* vars_states_left = NULL;
     TriVector* vars_states_right = NULL;
     DpllStateStack* new_state = NULL;
     DpllResult result = ERROR;
 
+    vars_states = create_tri_vector(cnf->vars_num);
+    if (vars_states == NULL) {
+        DPLL_ERROR("Insufficient memory");
+        result = ERROR;
+        goto exit;
+    }
+
+    positive_occurance_list = create_occurance_list(cnf, true);
+    if (positive_occurance_list == NULL) {
+        DPLL_ERROR("Insufficient memory");
+        result = ERROR;
+        goto exit;
+    }
+
+    negative_occurance_list = create_occurance_list(cnf, false);
+    if (negative_occurance_list == NULL) {
+        DPLL_ERROR("Insufficient memory");
+        result = ERROR;
+        goto exit;
+    }
+
+    propagate_all_units(cnf, vars_states);
+
+    cur_state = push_dpll_state(cur_state, vars_states);
+    if (cur_state == NULL) {
+        DPLL_ERROR("Insufficient memory");
+        result = ERROR;
+        goto exit;
+    }
+
     while (cur_state != NULL) {
         vars_states = cur_state->vars_states;
         cur_state = pop_dpll_state(cur_state);
-
-        propagate_all_units(cnf, vars_states);
 
         if (is_definitely_sat(cnf, vars_states)) {
             result = SAT;
@@ -257,6 +407,7 @@ DpllResult dpll_check_sat(const CNF* cnf) {
             goto exit;
         }
         set_state(vars_states_left, toggled_var, false);
+        propagate_units_for_toggled_var(cnf, vars_states_left, positive_occurance_list, negative_occurance_list, toggled_var, false);
         new_state = push_dpll_state(cur_state, vars_states_left);
         if (new_state == NULL) {
             DPLL_ERROR("Insufficient memory");
@@ -274,6 +425,7 @@ DpllResult dpll_check_sat(const CNF* cnf) {
             goto exit;
         }
         set_state(vars_states_right, toggled_var, true);
+        propagate_units_for_toggled_var(cnf, vars_states_right, positive_occurance_list, negative_occurance_list, toggled_var, true);
         new_state = push_dpll_state(cur_state, vars_states_right);
         if (new_state == NULL) {
             DPLL_ERROR("Insufficient memory");
@@ -303,6 +455,22 @@ exit:
     if (vars_states != NULL) {
         free(vars_states->states);
         free(vars_states);
+    }
+    if (positive_occurance_list != NULL) {
+        for (size_t i = 0, vars_num = cnf->vars_num; i < vars_num; ++i) {
+            while (positive_occurance_list[i] != NULL) {
+                positive_occurance_list[i] = list_drop_current(positive_occurance_list[i]);
+            }
+        }
+        free(positive_occurance_list);
+    }
+    if (negative_occurance_list != NULL) {
+        for (size_t i = 0, vars_num = cnf->vars_num; i < vars_num; ++i) {
+            while (negative_occurance_list[i] != NULL) {
+                negative_occurance_list[i] = list_drop_current(negative_occurance_list[i]);
+            }
+        }
+        free(negative_occurance_list);
     }
     while (cur_state != NULL) {
         free(cur_state->vars_states->states);
