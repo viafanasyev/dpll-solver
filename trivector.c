@@ -38,41 +38,6 @@ TriVector* clone_tri_vector(const TriVector* origin) {
     return clone;
 }
 
-void set_state(TriVector* tv, size_t index, bool positive) {
-    assert(tv != NULL);
-    assertf(index < tv->len, "Expected size in [0; %lu), but got %lu", tv->len, index);
-
-    tv->states[index] = positive ? 1 : -1;
-}
-
-signed char get_state(const TriVector* tv, size_t index) {
-    assert(tv != NULL);
-    assertf(index < tv->len, "Expected size in [0; %lu), but got %lu", tv->len, index);
-
-    return tv->states[index];
-}
-
-bool is_set_positive(const TriVector* tv, size_t index) {
-    assert(tv != NULL);
-    assertf(index < tv->len, "Expected size in [0; %lu), but got %lu", tv->len, index);
-
-    return tv->states[index] > 0;
-}
-
-bool is_set_negative(const TriVector* tv, size_t index) {
-    assert(tv != NULL);
-    assertf(index < tv->len, "Expected size in [0; %lu), but got %lu", tv->len, index);
-
-    return tv->states[index] < 0;
-}
-
-bool is_not_set(const TriVector* tv, size_t index) {
-    assert(tv != NULL);
-    assertf(index < tv->len, "Expected size in [0; %lu), but got %lu", tv->len, index);
-
-    return tv->states[index] == 0;
-}
-
 size_t get_index_of_non_set(const TriVector* tv) {
     assert(tv != NULL);
 

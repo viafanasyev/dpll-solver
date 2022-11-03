@@ -51,17 +51,16 @@ static bool is_definitely_sat_clause(
     const Clause* clause,
     const TriVector* vars_states
 ) { 
-    size_t vars_num = clause->len;
     signed int* vars = clause->vars;
-    for (size_t var_num = 0; var_num < vars_num; ++var_num) {
+    for (size_t var_num = 0, len = clause->len; var_num < len; ++var_num) {
         signed int var = vars[var_num];
-        size_t var_index = var_to_index(var);
+        assert(var != 0);
         if (var > 0) {
-            if (is_set_positive(vars_states, var_index)) {
+            if (is_set_positive(vars_states, var - 1)) {
                 return true;
             }
         } else {
-            if (is_set_negative(vars_states, var_index)) {
+            if (is_set_negative(vars_states, -var - 1)) {
                 return true;
             }
         }
@@ -73,17 +72,16 @@ static bool is_definitely_unsat_clause(
     const Clause* clause,
     const TriVector* vars_states
 ) {
-    size_t vars_num = clause->len;
     signed int* vars = clause->vars;
-    for (size_t var_num = 0; var_num < vars_num; ++var_num) {
+    for (size_t var_num = 0, len = clause->len; var_num < len; ++var_num) {
         signed int var = vars[var_num];
-        size_t var_index = var_to_index(var);
+        assert(var != 0);
         if (var > 0) {
-            if (!is_set_negative(vars_states, var_index)) {
+            if (!is_set_negative(vars_states, var - 1)) {
                 return false;
             }
         } else {
-            if (!is_set_positive(vars_states, var_index)) {
+            if (!is_set_positive(vars_states, -var - 1)) {
                 return false;
             }
         }
@@ -95,8 +93,9 @@ static bool is_definitely_sat(
     const CNF* cnf,
     const TriVector* vars_states
 ) {
+    Clause** clauses = cnf->clauses;
     for (size_t clause_num = 0, clauses_num = cnf->clauses_num; clause_num < clauses_num; ++clause_num) {
-        if (!is_definitely_sat_clause(cnf->clauses[clause_num], vars_states)) {
+        if (!is_definitely_sat_clause(clauses[clause_num], vars_states)) {
            return false; 
         }
     }
@@ -107,8 +106,9 @@ static bool is_definitely_unsat(
     const CNF* cnf,
     const TriVector* vars_states
 ) {
+    Clause** clauses = cnf->clauses;
     for (size_t clause_num = 0, clauses_num = cnf->clauses_num; clause_num < clauses_num; ++clause_num) {
-        if (is_definitely_unsat_clause(cnf->clauses[clause_num], vars_states)) {
+        if (is_definitely_unsat_clause(clauses[clause_num], vars_states)) {
             return true;
         }
     }
@@ -135,13 +135,12 @@ static signed int get_single_undecided_var_or_zero(
     for (size_t var_num = 0; var_num < len; ++var_num) {
         signed int var = vars[var_num];
         assert(var != 0);
-        size_t var_index = var_to_index(var);
         if (var > 0) {
-            if (is_set_positive(vars_states, var_index)) {
+            if (is_set_positive(vars_states, var - 1)) {
                 // This clause is already SAT
                 return 0;
             }
-            if (!is_set_negative(vars_states, var_index)) {
+            if (!is_set_negative(vars_states, var - 1)) {
                 if (undecided_var != 0) {
                     // There are at least two undecided vars
                     return 0;
@@ -149,11 +148,11 @@ static signed int get_single_undecided_var_or_zero(
                 undecided_var = var;
             }
         } else {
-            if (is_set_negative(vars_states, var_index)) {
+            if (is_set_negative(vars_states, -var - 1)) {
                 // This clause is already SAT
                 return 0;
             }
-            if (!is_set_positive(vars_states, var_index)) {
+            if (!is_set_positive(vars_states, -var - 1)) {
                 if (undecided_var != 0) {
                     // There are at least two undecided vars
                     return 0;
@@ -172,11 +171,14 @@ static void propagate_all_units(
     assert(cnf != NULL);
     assert(vars_states != NULL);
 
+    Clause** clauses = cnf->clauses;
+    size_t clauses_num = cnf->clauses_num;
+
     bool any_changes = false;
     do {
         any_changes = false;
-        for (size_t clause_num = 0, clauses_num = cnf->clauses_num; clause_num < clauses_num; ++clause_num) {
-            signed int undecided_var = get_single_undecided_var_or_zero(cnf->clauses[clause_num], vars_states);
+        for (size_t clause_num = 0; clause_num < clauses_num; ++clause_num) {
+            signed int undecided_var = get_single_undecided_var_or_zero(clauses[clause_num], vars_states);
             if (undecided_var != 0) {
                 size_t var_index = var_to_index(undecided_var);
                 assert(is_not_set(vars_states, var_index));
