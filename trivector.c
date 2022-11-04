@@ -6,7 +6,7 @@
 #include "debug.h"
 #include "trivector.h"
 
-TriVector* create_tri_vector(size_t len) {
+TriVector* create_trivector(size_t len) {
     TriVector* tv = (TriVector*) calloc(1, sizeof(TriVector));
     if (tv == NULL) {
         fprintf(stderr, "Tri Vector Error: Insufficient memory\n");
@@ -14,7 +14,7 @@ TriVector* create_tri_vector(size_t len) {
     }
 
     tv->len = len;
-    tv->states = (signed char*) calloc(len, sizeof(signed char));
+    tv->states = (TriVectorState*) calloc(len, sizeof(TriVectorState));
     if (tv->states == NULL) {
         fprintf(stderr, "Tri Vector Error: Insufficient memory\n");
         free(tv);
@@ -23,28 +23,35 @@ TriVector* create_tri_vector(size_t len) {
     return tv;
 }
 
-TriVector* clone_tri_vector(const TriVector* origin) {
+TriVector* clone_trivector(const TriVector* origin) {
     assert(origin != NULL);
 
     size_t len = origin->len;
-    TriVector* clone = create_tri_vector(len);
+    TriVector* clone = create_trivector(len);
     if (clone == NULL) {
         fprintf(stderr, "Tri Vector Error: Insufficient memory\n");
         return NULL;
     }
 
     clone->len = len;
-    memcpy(clone->states, origin->states, len * sizeof(signed char));
+    memcpy(clone->states, origin->states, len * sizeof(TriVectorState));
     return clone;
 }
 
-size_t get_index_of_non_set(const TriVector* tv) {
+void free_trivector(TriVector* tv) {
+    if (tv != NULL) {
+        free(tv->states);
+        free(tv);
+    }
+}
+
+size_t trivector_index_of_not_set(const TriVector* tv) {
     assert(tv != NULL);
 
     size_t len = tv->len;
-    signed char* states = tv->states;
+    TriVectorState* states = tv->states;
     for (size_t i = 0; i < len; ++i) {
-        if (states[i] == 0) {
+        if (states[i] == NOT_SET) {
             return i;
         }
     }

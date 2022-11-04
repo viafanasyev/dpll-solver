@@ -2,49 +2,50 @@
 #include <stdbool.h>
 #include <stddef.h>
 
+typedef enum {
+    NOT_SET,
+    SET_TRUE,
+    SET_FALSE,
+} __attribute__((__packed__)) TriVectorState;
+
 typedef struct TriVector {
     size_t len;
-    signed char* states; // TODO: Replace chars with enums of 1-byte size
+    TriVectorState* states;
 } TriVector;
 
-TriVector* create_tri_vector(size_t len);
+TriVector* create_trivector(size_t len);
 
-TriVector* clone_tri_vector(const TriVector* origin);
+TriVector* clone_trivector(const TriVector* origin);
 
-static inline void set_state(TriVector* tv, size_t index, bool positive) {
+void free_trivector(TriVector* tv);
+
+static inline void trivector_set(TriVector* tv, size_t index, bool is_true) {
     assert(tv != NULL);
     assertf(index < tv->len, "Expected size in [0; %lu), but got %lu", tv->len, index);
 
-    tv->states[index] = positive ? 1 : -1;
+    tv->states[index] = is_true ? SET_TRUE : SET_FALSE;
 }
 
-static inline signed char get_state(const TriVector* tv, size_t index) {
+static inline bool trivector_is_set_true(const TriVector* tv, size_t index) {
     assert(tv != NULL);
     assertf(index < tv->len, "Expected size in [0; %lu), but got %lu", tv->len, index);
 
-    return tv->states[index];
+    return tv->states[index] == SET_TRUE;
 }
 
-static inline bool is_set_positive(const TriVector* tv, size_t index) {
+static inline bool trivector_is_set_false(const TriVector* tv, size_t index) {
     assert(tv != NULL);
     assertf(index < tv->len, "Expected size in [0; %lu), but got %lu", tv->len, index);
 
-    return tv->states[index] > 0;
+    return tv->states[index] == SET_FALSE;
 }
 
-static inline bool is_set_negative(const TriVector* tv, size_t index) {
+static inline bool trivector_is_not_set(const TriVector* tv, size_t index) {
     assert(tv != NULL);
     assertf(index < tv->len, "Expected size in [0; %lu), but got %lu", tv->len, index);
 
-    return tv->states[index] < 0;
+    return tv->states[index] == NOT_SET;
 }
 
-static inline bool is_not_set(const TriVector* tv, size_t index) {
-    assert(tv != NULL);
-    assertf(index < tv->len, "Expected size in [0; %lu), but got %lu", tv->len, index);
-
-    return tv->states[index] == 0;
-}
-
-size_t get_index_of_non_set(const TriVector* tv);
+size_t trivector_index_of_not_set(const TriVector* tv);
 

@@ -17,3 +17,5 @@ int read_dimacs_clause(char* line, size_t max_vars_num, Clause* clause);
 
 CNF* read_dimacs_cnf(FILE* fp);
 
+void free_cnf(CNF* cnf);
+

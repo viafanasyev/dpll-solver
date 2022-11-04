@@ -161,3 +161,14 @@ error:
     return NULL;
 }
 
+void free_cnf(CNF* cnf) {
+    if (cnf != NULL) {
+        for (size_t i = 0; i < cnf->clauses_num; ++i) {
+            free(cnf->clauses[i]->vars);
+            free(cnf->clauses[i]);
+        }
+        free(cnf->clauses);
+        free(cnf);
+    }
+}
+

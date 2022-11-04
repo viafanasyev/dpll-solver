@@ -2,7 +2,6 @@ CC                  = gcc
 CFLAGS              = -std=c11 -Wpedantic -Werror
 SOURCES             = main.c cnf.c dpll.c trivector.c
 TEST_DIR            = tests
-TEST_FAIL_EXIT_CODE = 100500
 OUT_DIR				= out
 RELEASE_TARGET      = $(OUT_DIR)/release/dpll
 DEBUG_TARGET        = $(OUT_DIR)/debug/dpll

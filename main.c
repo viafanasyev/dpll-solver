@@ -41,12 +41,7 @@ int main(int argc, char* argv[]) {
 
     DpllResult result = dpll_check_sat(cnf);
 
-    for (size_t i = 0; i < cnf->clauses_num; ++i) {
-        free(cnf->clauses[i]->vars);
-        free(cnf->clauses[i]);
-    }
-    free(cnf->clauses);
-    free(cnf);
+    free_cnf(cnf);
 
     switch (result) {
         case SAT:
