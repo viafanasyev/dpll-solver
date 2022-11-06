@@ -33,11 +33,12 @@ int read_dimacs_clause(char* line, size_t max_vars_num, Clause* clause) {
     }
 
     size_t real_vars_num = 0;
-    char* token = strtok(line, " ");
+    const char* delims = " \t";
+    char* token = strtok(line, delims);
     signed int var = 0; 
     while (token != NULL) {
         var = atoi(token);
-        token = strtok(NULL, " ");
+        token = strtok(NULL, delims);
         if (var == 0) {
             break;
         }
@@ -87,14 +88,43 @@ CNF* read_dimacs_cnf(FILE* fp) {
             // Comment
             continue;
         }
-        if (read > sizeof("p cnf ") - 1 && !strncmp(line, "p cnf ", sizeof("p cnf ") - 1)) {
+        if (line[0] == 'p') {
             // Number of variables and clauses
             if (vars_num != 0 && clauses_num != 0) {
                 CNF_PARSE_ERROR_F("Number of vars and clauses is set twice (line #%zu)", line_num);
                 goto error;
             }
-            if (sscanf(line + sizeof("p cnf ") - 1, "%zu %zu\n", &vars_num, &clauses_num) != 2) {
-                CNF_PARSE_ERROR_F("Bad syntax for number of vars and clauses (line #%zu)", line_num);
+
+            const char* delims = " \t";
+            char* token = NULL;
+
+            token = strtok(line + 1 * sizeof(char), delims);
+            if (token == NULL) {
+                CLAUSE_PARSE_ERROR_F("Bad syntax in vars and clauses declaration: expected 'cnf', but got nothing (line #%zu)", line_num);
+                goto error;
+            }
+            if (strlen(token) < 3UL || strncmp(token, "cnf", 3UL)) {
+                CLAUSE_PARSE_ERROR_F("Bad syntax in vars and clauses declaration: expected 'cnf', but got '%s' (line #%zu)", token, line_num);
+                goto error;
+            }
+
+            token = strtok(NULL, delims);
+            if (token == NULL) {
+                CLAUSE_PARSE_ERROR_F("Bad syntax in vars and clauses declaration: expected vars num, but got nothing (line #%zu)", line_num);
+                goto error;
+            }
+            vars_num = atoi(token);
+
+            token = strtok(NULL, delims);
+            if (token == NULL) {
+                CLAUSE_PARSE_ERROR_F("Bad syntax in vars and clauses declaration: expected clauses num, but got nothing (line #%zu)", line_num);
+                goto error;
+            }
+            clauses_num = atoi(token);
+
+            token = strtok(NULL, delims);
+            if (token != NULL) {
+                CLAUSE_PARSE_ERROR_F("Bad syntax in vars and clauses declaration: expected EOL, but got '%s' (line #%zu)", token, line_num);
                 goto error;
             }
 
